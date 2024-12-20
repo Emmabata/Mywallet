@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:my_pocket_wallet/animated_success_message.dart';
+import 'package:my_pocket_wallet/CustomFunc/custom_button.dart';
 
 // SendMoneyPage widget for the Send Money screen.
 class SendMoneyPage extends StatefulWidget {
@@ -9,24 +11,38 @@ class SendMoneyPage extends StatefulWidget {
 }
 
 class _SendMoneyPageState extends State<SendMoneyPage> {
+  final _formKey = GlobalKey<FormState>(); // GlobalKey for form state management
   String recipient = '';  // Store the recipient's details (name or number).
   double amount = 0.0;     // Store the amount to send.
-  String paymentMethod = ''; // Store the selected payment method.
+  String paymentMethod = 'Bank Account'; // Store the selected payment method "Bank account is a default value to avoid null".
+  bool isFavorite = false; //Boolean to store if transaction is marked as favorite
+  bool _showSuccessMessage = false;  //Boolean to show success message animation
 
   // Function to confirm the transaction and navigate to confirmation page.
   void _confirmTransaction() {
-    // If all fields are filled, navigate to the confirmation page.
-    if (recipient.isNotEmpty && amount > 0 && paymentMethod.isNotEmpty) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => TransactionConfirmationPage(
-            recipient: recipient,
-            amount: amount,
-            paymentMethod: paymentMethod,
+    if (_formKey.currentState!.validate()) { // Validates every form field
+    setState(() {
+        _showSuccessMessage = true; // Show the success message
+      });
+
+      // Optionally navigate after showing the success message
+        Future.delayed(const Duration(seconds: 2), () {
+          setState(() {
+            _showSuccessMessage = false; // Hide the success message
+          });
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TransactionConfirmationPage(
+              recipient: recipient,
+              amount: amount,
+              paymentMethod: paymentMethod,
+              isFavorite: isFavorite,
+            ),
           ),
-        ),
-      );
+        );
+      });
     } else {
       // Show an error if any field is empty.
       ScaffoldMessenger.of(context).showSnackBar(
@@ -40,61 +56,85 @@ class _SendMoneyPageState extends State<SendMoneyPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Send Money')),  // AppBar with page title.
       body: Padding(
-        padding: const EdgeInsets.all(16.0),  // Padding around the main content.
-        child: Column(
-          children: [
-            // Recipient input field
-            TextField(
-              decoration: const InputDecoration(labelText: 'Recipient'),  // Label for the recipient field.
-              onChanged: (value) {
-                setState(() {
-                  recipient = value;  // Update recipient value when text changes.
-                });
-              },
-            ),
-            const SizedBox(height: 16),  // Spacer between input fields.
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_showSuccessMessage)
+                  const AnimatedSuccessMessage(), // Display success message if true
+                const SizedBox(height: 16),
 
-            // Amount input field
-            TextField(
-              decoration: const InputDecoration(labelText: 'Amount'),  // Label for the amount field.
-              keyboardType: TextInputType.number,  // Only allows numeric input.
-              onChanged: (value) {
-                setState(() {
-                  amount = double.tryParse(value) ?? 0.0;  // Update amount if valid.
-                });
-              },
-            ),
-            const SizedBox(height: 16),  // Spacer between input fields.
-
-            // Payment method dropdown
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(labelText: 'Payment Method'),  // Label for the dropdown field.
-              value: paymentMethod.isEmpty ? null : paymentMethod,  // Set the initial value.
-              items: const [
-                // Dropdown items for selecting payment method.
-                DropdownMenuItem(
-                  value: 'Bank Account',
-                  child: Text('Bank Account'),
+                //Recipient input field
+                TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Recipient',
+                    hintText: 'Enter recipient\'s name',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter recipient\'s name';
+                    }
+                    return null;
+                  },
+                  onChanged: (value) => recipient = value,
                 ),
-                DropdownMenuItem(
-                  value: 'Mobile Wallet',
-                  child: Text('Mobile Wallet'),
+                const SizedBox(height: 16),
+                TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Amount',
+                    hintText: 'Enter amount',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || double.tryParse(value) == null || double.tryParse(value)! <= 0) {
+                      return 'Please enter a positive number';
+                    }
+                    return null;
+                  },
+                  onChanged: (value) => amount = double.tryParse(value) ?? 0.0,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Payment Method',
+                    border: OutlineInputBorder(),
+                  ),
+                  value: paymentMethod,
+                  onChanged: (value) {
+                    setState(() {
+                      paymentMethod = value!;
+                    });
+                  },
+                  items: const [
+                    DropdownMenuItem(value: 'Bank Account', child: Text('Bank Account')),
+                    DropdownMenuItem(value: 'Mobile Wallet', child: Text('Mobile Wallet')),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Mark as Favorite'),
+                  value: isFavorite,
+                  onChanged: (bool value) {
+                    setState(() {
+                      isFavorite = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                CustomButton(
+                  text: "Proceed to confirm",
+                  onPressed: _confirmTransaction,
+                  color: const Color.fromARGB(255, 76, 33, 135),
+                  textStyle: const TextStyle(fontSize: 16, color: Colors.white),
                 ),
               ],
-              onChanged: (value) {
-                setState(() {
-                  paymentMethod = value ?? '';  // Update the payment method on selection.
-                });
-              },
             ),
-            const SizedBox(height: 16),  // Spacer between input fields.
-
-            // Proceed button to confirm transaction
-            ElevatedButton(
-              onPressed: _confirmTransaction,  // Trigger confirmation when pressed.
-              child: const Text('Proceed to Confirm'),  // Button text.
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -106,6 +146,7 @@ class TransactionConfirmationPage extends StatelessWidget {
   final String recipient;
   final double amount;
   final String paymentMethod;
+  final bool isFavorite; //Boolean to receive the favorite status.
 
   // Constructor to receive the transaction details.
   const TransactionConfirmationPage({
@@ -113,6 +154,7 @@ class TransactionConfirmationPage extends StatelessWidget {
     required this.recipient,
     required this.amount,
     required this.paymentMethod,
+    this.isFavorite = false, //initializing isFavorite variable
   }) : super(key: key);
 
   @override
@@ -129,6 +171,7 @@ class TransactionConfirmationPage extends StatelessWidget {
             Text('Recipient: $recipient'),  // Display recipient info.
             Text('Amount: \$${amount.toStringAsFixed(2)}'),  // Display amount with two decimals.
             Text('Payment Method: $paymentMethod'),  // Display selected payment method.
+            Text('Favorite: ${isFavorite ? "Yes" : "No"}'), //A display if the transaction is marked as favourite or not.
             const SizedBox(height: 20),  // Spacer before buttons.
 
             // Confirm Button to process the transaction
